@@ -39,7 +39,7 @@ public class MutantChecker {
      * @param dna
      * @return
      */
-    boolean isMutant(String[] dna) {
+    public boolean isMutant(String[] dna) {
         validateDnaParameter(dna);
 
         // Dna is NXN. so, it is a square. i can use same size.
