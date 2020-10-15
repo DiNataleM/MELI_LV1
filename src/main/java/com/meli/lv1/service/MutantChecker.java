@@ -1,7 +1,9 @@
 package com.meli.lv1.service;
 
-import com.meli.lv1.utils.CountHelper;
+import com.meli.lv1.exception.InvalidMutantDnaException;
+import com.meli.lv1.utils.DirectionCountHelper;
 
+import static com.meli.lv1.utils.DirectionCountHelper.Direction.*;
 import static org.springframework.util.ObjectUtils.isEmpty;
 
 /**
@@ -16,22 +18,6 @@ import static org.springframework.util.ObjectUtils.isEmpty;
 public class MutantChecker {
     public static final int MAX_SEQUENCE = 4;
     public static final int SEQUENCES_TO_FIND = 2;
-
-    private CountHelper hCount;
-    private CountHelper vCount;
-    private CountHelper oDRightCount;
-    private CountHelper oDLeftCount;
-    private CountHelper oTRightCount;
-    private CountHelper oTLeftCount;
-
-    public MutantChecker() {
-        hCount = new CountHelper(MAX_SEQUENCE);
-        vCount = new CountHelper(MAX_SEQUENCE);
-        oDRightCount = new CountHelper(MAX_SEQUENCE);
-        oDLeftCount = new CountHelper(MAX_SEQUENCE);
-        oTRightCount = new CountHelper(MAX_SEQUENCE);
-        oTLeftCount = new CountHelper(MAX_SEQUENCE);
-    }
 
     /**
      * Return true if the dna is from a mutant.
@@ -50,13 +36,15 @@ public class MutantChecker {
             return false;
         }
 
-        for (int c = 0; c < size; c++) {//Each c
-            resetLoop();
-            for (int l = 0; l < size; l++) {
+        DirectionCountHelper countHelper = new DirectionCountHelper(MAX_SEQUENCE);
 
-                search(dna, c, l);
+        for (int c = 0; c < size; c++) {// Each column
+            countHelper.resetLoop();
 
-                if (getTotalCoincidence() >= SEQUENCES_TO_FIND) {
+            for (int l = 0; l < size; l++) { // Each letter
+                search(countHelper, dna, c, l);
+
+                if (countHelper.getCoincidences() >= SEQUENCES_TO_FIND) {
                     return true;
                 }
             }
@@ -68,15 +56,16 @@ public class MutantChecker {
     /**
      * search in all directions.
      *
+     * @param countHelper
      * @param dna
      * @param column
      * @param letter
      */
-    private void search(String[] dna, int column, int letter) {
-        horizontalSearch(dna, column, letter);
-        verticalSearch(dna, column, letter);
-        obliqueToDownSearch(dna, column, letter);
-        obliqueToUpSearch(dna, column, letter);
+    private void search(DirectionCountHelper countHelper, String[] dna, int column, int letter) {
+        horizontalSearch(countHelper, dna, column, letter);
+        verticalSearch(countHelper, dna, column, letter);
+        obliqueToDownSearch(countHelper, dna, column, letter);
+        obliqueToUpSearch(countHelper, dna, column, letter);
 
     }
 
@@ -88,12 +77,13 @@ public class MutantChecker {
      * → H H H H
      * → H H H H
      *
+     * @param countHelper
      * @param dna
      * @param col
      * @param let
      */
-    private void horizontalSearch(String[] dna, int col, int let) {
-        hCount.check(dna[col].charAt(let));
+    private void horizontalSearch(DirectionCountHelper countHelper, String[] dna, int col, int let) {
+        countHelper.check(HORIZONTAL, dna[col].charAt(let));
     }
 
     /**
@@ -104,12 +94,13 @@ public class MutantChecker {
      * V V V V
      * V V V V
      *
+     * @param countHelper
      * @param dna
      * @param col
      * @param let
      */
-    private void verticalSearch(String[] dna, int col, int let) {
-        vCount.check(dna[let].charAt(col));
+    private void verticalSearch(DirectionCountHelper countHelper, String[] dna, int col, int let) {
+        countHelper.check(VERTICAL, dna[let].charAt(col));
     }
 
     /**
@@ -125,19 +116,20 @@ public class MutantChecker {
      * . . . . R R | L L . . . .
      * . . . . . R | L . . . . .
      *
+     * @param countHelper
      * @param dna
      * @param col
      * @param let
      */
-    private void obliqueToDownSearch(String[] dna, int col, int let) {
+    private void obliqueToDownSearch(DirectionCountHelper countHelper, String[] dna, int col, int let) {
         int size = dna.length;
 
         if (col + let < size) { // Check Right
-            oDRightCount.check(dna[let].charAt(col + let));
+            countHelper.check(OBLIQUE_DOW_RIGHT, dna[let].charAt(col + let));
         }
 
         if (col - let >= 0) { // Check Left
-            oDLeftCount.check(dna[let].charAt(col - let));
+            countHelper.check(OBLIQUE_DOW_LEFT, dna[let].charAt(col - let));
         }
 
     }
@@ -154,11 +146,12 @@ public class MutantChecker {
      * . R R R R . | . L L L L .
      * 🡥 🡥 🡥 🡥 🡥    🡤 🡤 🡤 🡤 🡤
      *
+     * @param countHelper
      * @param dna
      * @param col
      * @param let
      */
-    private void obliqueToUpSearch(String[] dna, int col, int let) {
+    private void obliqueToUpSearch(DirectionCountHelper countHelper, String[] dna, int col, int let) {
         // the first and the last was checked for the obliqueToDownSearch method
         if (col == 0 || col == (dna.length - 1)) {
             return;
@@ -166,32 +159,12 @@ public class MutantChecker {
 
         int size = dna.length;
         if (col + let < size) { // Check right
-            oTRightCount.check(dna[size - 1 - let].charAt(col + let));
+            countHelper.check(OBLIQUE_TOP_RIGHT, dna[size - 1 - let].charAt(col + let));
         }
 
         if (col - let >= 0) { // Check Left
-            oTLeftCount.check(dna[size - 1 - let].charAt(col - let));
+            countHelper.check(OBLIQUE_TOP_LEFT, dna[size - 1 - let].charAt(col - let));
         }
-    }
-
-    /**
-     * Return add the coincidence.
-     *
-     * @return
-     */
-    private int getTotalCoincidence() {
-        return hCount.getCoincidence() + vCount.getCoincidence() +
-                oTRightCount.getCoincidence() + oTLeftCount.getCoincidence() +
-                oDRightCount.getCoincidence() + oDLeftCount.getCoincidence();
-    }
-
-    private void resetLoop() {
-        hCount.resetLoop();
-        vCount.resetLoop();
-        oDRightCount.resetLoop();
-        oDLeftCount.resetLoop();
-        oTRightCount.resetLoop();
-        oTLeftCount.resetLoop();
     }
 
     /**
@@ -202,11 +175,11 @@ public class MutantChecker {
     private void validateDnaParameter(String[] dna) {
 
         if (isEmpty(dna)) {
-            throw new IllegalArgumentException("The dna parameter is empty.");
+            throw new InvalidMutantDnaException("The dna parameter is empty.");
         }
 
         if (dna.length != dna[0].length()) {
-            throw new IllegalArgumentException("The dna parameter is not NXN.");
+            throw new InvalidMutantDnaException("The dna parameter is not NXN.");
         }
     }
 
